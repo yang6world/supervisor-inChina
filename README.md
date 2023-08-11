@@ -1,5 +1,5 @@
 # Home Assistant Supervisor
-
+## 由于暂时无法编译，项目暂时搁浅
 ## 首个家庭自动化私有云解决方案
 
 Home Assistant（前身为Hass.io）是一个基于容器的系统，用于管理您的Home Assistant Core安装和相关应用程序。该系统通过与Supervisor通信由Home Assistant进行控制。Supervisor提供了一个API来管理安装。这包括更改网络设置或安装和更新软件。
