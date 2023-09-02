@@ -28,14 +28,12 @@ RUN_RELOAD_BACKUPS = 72000
 RUN_RELOAD_HOST = 7600
 RUN_RELOAD_UPDATER = 7200
 RUN_RELOAD_INGRESS = 930
+RUN_RELOAD_MOUNTS = 900
 
 RUN_WATCHDOG_HOMEASSISTANT_API = 120
 
 RUN_WATCHDOG_ADDON_APPLICATON = 120
 RUN_WATCHDOG_OBSERVER_APPLICATION = 180
-
-RUN_REFRESH_ADDON = 15
-RUN_REFRESH_MOUNTS = 900
 
 PLUGIN_AUTO_UPDATE_CONDITIONS = PLUGIN_UPDATE_CONDITIONS + [JobCondition.RUNNING]
 
@@ -65,7 +63,7 @@ class Tasks(CoreSysAttributes):
         self.sys_scheduler.register_task(self.sys_backups.reload, RUN_RELOAD_BACKUPS)
         self.sys_scheduler.register_task(self.sys_host.reload, RUN_RELOAD_HOST)
         self.sys_scheduler.register_task(self.sys_ingress.reload, RUN_RELOAD_INGRESS)
-        self.sys_scheduler.register_task(self.sys_mounts.reload, RUN_REFRESH_MOUNTS)
+        self.sys_scheduler.register_task(self.sys_mounts.reload, RUN_RELOAD_MOUNTS)
 
         # Watchdog
         self.sys_scheduler.register_task(
@@ -78,12 +76,12 @@ class Tasks(CoreSysAttributes):
             self._watchdog_addon_application, RUN_WATCHDOG_ADDON_APPLICATON
         )
 
-        # Refresh
-        self.sys_scheduler.register_task(self._refresh_addon, RUN_REFRESH_ADDON)
-
         _LOGGER.info("All core tasks are scheduled")
 
-    @Job(conditions=ADDON_UPDATE_CONDITIONS + [JobCondition.RUNNING])
+    @Job(
+        name="tasks_update_addons",
+        conditions=ADDON_UPDATE_CONDITIONS + [JobCondition.RUNNING],
+    )
     async def _update_addons(self):
         """Check if an update is available for an Add-on and update it."""
         start_tasks: list[Awaitable[None]] = []
@@ -112,13 +110,14 @@ class Tasks(CoreSysAttributes):
         await asyncio.gather(*start_tasks)
 
     @Job(
+        name="tasks_update_supervisor",
         conditions=[
             JobCondition.AUTO_UPDATE,
             JobCondition.FREE_SPACE,
             JobCondition.HEALTHY,
             JobCondition.INTERNET_HOST,
             JobCondition.RUNNING,
-        ]
+        ],
     )
     async def _update_supervisor(self):
         """Check and run update of Supervisor Supervisor."""
@@ -172,7 +171,7 @@ class Tasks(CoreSysAttributes):
         finally:
             self._cache[HASS_WATCHDOG_API] = 0
 
-    @Job(conditions=PLUGIN_AUTO_UPDATE_CONDITIONS)
+    @Job(name="tasks_update_cli", conditions=PLUGIN_AUTO_UPDATE_CONDITIONS)
     async def _update_cli(self):
         """Check and run update of cli."""
         if not self.sys_plugins.cli.need_update:
@@ -183,7 +182,7 @@ class Tasks(CoreSysAttributes):
         )
         await self.sys_plugins.cli.update()
 
-    @Job(conditions=PLUGIN_AUTO_UPDATE_CONDITIONS)
+    @Job(name="tasks_update_dns", conditions=PLUGIN_AUTO_UPDATE_CONDITIONS)
     async def _update_dns(self):
         """Check and run update of CoreDNS plugin."""
         if not self.sys_plugins.dns.need_update:
@@ -195,7 +194,7 @@ class Tasks(CoreSysAttributes):
         )
         await self.sys_plugins.dns.update()
 
-    @Job(conditions=PLUGIN_AUTO_UPDATE_CONDITIONS)
+    @Job(name="tasks_update_audio", conditions=PLUGIN_AUTO_UPDATE_CONDITIONS)
     async def _update_audio(self):
         """Check and run update of PulseAudio plugin."""
         if not self.sys_plugins.audio.need_update:
@@ -207,7 +206,7 @@ class Tasks(CoreSysAttributes):
         )
         await self.sys_plugins.audio.update()
 
-    @Job(conditions=PLUGIN_AUTO_UPDATE_CONDITIONS)
+    @Job(name="tasks_update_observer", conditions=PLUGIN_AUTO_UPDATE_CONDITIONS)
     async def _update_observer(self):
         """Check and run update of Observer plugin."""
         if not self.sys_plugins.observer.need_update:
@@ -219,7 +218,7 @@ class Tasks(CoreSysAttributes):
         )
         await self.sys_plugins.observer.update()
 
-    @Job(conditions=PLUGIN_AUTO_UPDATE_CONDITIONS)
+    @Job(name="tasks_update_multicast", conditions=PLUGIN_AUTO_UPDATE_CONDITIONS)
     async def _update_multicast(self):
         """Check and run update of multicast."""
         if not self.sys_plugins.multicast.need_update:
@@ -278,21 +277,7 @@ class Tasks(CoreSysAttributes):
             finally:
                 self._cache[addon.slug] = 0
 
-    async def _refresh_addon(self) -> None:
-        """Refresh addon state."""
-        for addon in self.sys_addons.installed:
-            # if watchdog need looking for
-            if addon.watchdog or addon.state != AddonState.STARTED:
-                continue
-
-            # if Addon have running actions
-            if addon.in_progress or await addon.is_running():
-                continue
-
-            # Adjust state
-            addon.state = AddonState.STOPPED
-
-    @Job(conditions=[JobCondition.SUPERVISOR_UPDATED])
+    @Job(name="tasks_reload_store", conditions=[JobCondition.SUPERVISOR_UPDATED])
     async def _reload_store(self) -> None:
         """Reload store and check for addon updates."""
         await self.sys_store.reload()

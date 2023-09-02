@@ -18,6 +18,7 @@ from supervisor.docker.addon import DockerAddon
 from supervisor.docker.const import ContainerState
 from supervisor.docker.monitor import DockerContainerStateEvent
 from supervisor.exceptions import AddonsError, AddonsJobError, AudioUpdateError
+from supervisor.ingress import Ingress
 from supervisor.store.repository import Repository
 from supervisor.utils.dt import utcnow
 
@@ -201,6 +202,7 @@ async def test_watchdog_on_stop(coresys: CoreSys, install_addon_ssh: Addon) -> N
 
 async def test_listener_attached_on_install(coresys: CoreSys, repository):
     """Test events listener attached on addon install."""
+    coresys.hardware.disk.get_disk_free_space = lambda x: 5000
     container_collection = MagicMock()
     container_collection.get.side_effect = DockerException()
     with patch(
@@ -216,7 +218,7 @@ async def test_listener_attached_on_install(coresys: CoreSys, repository):
         "supervisor.addons.model.AddonModel.with_ingress",
         new=PropertyMock(return_value=False),
     ):
-        await coresys.addons.install.__wrapped__(coresys.addons, TEST_ADDON_SLUG)
+        await coresys.addons.install(TEST_ADDON_SLUG)
 
     _fire_test_event(coresys, f"addon_{TEST_ADDON_SLUG}", ContainerState.RUNNING)
     await asyncio.sleep(0)
@@ -530,10 +532,35 @@ async def test_restore(
     tarfile = SecureTarFile(get_fixture_path(f"backup_local_ssh_{status}.tar.gz"), "r")
     with patch.object(DockerAddon, "is_running", return_value=False), patch.object(
         CpuArch, "supported", new=PropertyMock(return_value=["aarch64"])
-    ):
+    ), patch.object(Ingress, "update_hass_panel") as update_hass_panel:
         start_task = await coresys.addons.restore(TEST_ADDON_SLUG, tarfile)
 
+        update_hass_panel.assert_called_once()
+
     assert bool(start_task) is (status == "running")
+
+
+async def test_restore_while_running(
+    coresys: CoreSys,
+    install_addon_ssh: Addon,
+    container: MagicMock,
+    tmp_supervisor_data,
+    path_extern,
+):
+    """Test restore of a running addon."""
+    container.status = "running"
+    coresys.hardware.disk.get_disk_free_space = lambda x: 5000
+    install_addon_ssh.path_data.mkdir()
+    await install_addon_ssh.load()
+
+    tarfile = SecureTarFile(get_fixture_path("backup_local_ssh_stopped.tar.gz"), "r")
+    with patch.object(DockerAddon, "is_running", return_value=True), patch.object(
+        CpuArch, "supported", new=PropertyMock(return_value=["aarch64"])
+    ), patch.object(Ingress, "update_hass_panel"):
+        start_task = await coresys.addons.restore(TEST_ADDON_SLUG, tarfile)
+
+    assert bool(start_task) is False
+    container.stop.assert_called_once()
 
 
 async def test_start_when_running(

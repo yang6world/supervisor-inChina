@@ -152,11 +152,14 @@ class AddonManager(CoreSysAttributes):
                 capture_exception(err)
 
     @Job(
+        name="addon_manager_install",
         conditions=ADDON_UPDATE_CONDITIONS,
         on_condition=AddonsJobError,
     )
     async def install(self, slug: str) -> None:
         """Install an add-on."""
+        self.sys_jobs.current.reference = slug
+
         if slug in self.local:
             raise AddonsError(f"Add-on {slug} is already installed", _LOGGER.warning)
         store = self.store.get(slug)
@@ -247,6 +250,7 @@ class AddonManager(CoreSysAttributes):
         _LOGGER.info("Add-on '%s' successfully removed", slug)
 
     @Job(
+        name="addon_manager_update",
         conditions=ADDON_UPDATE_CONDITIONS,
         on_condition=AddonsJobError,
     )
@@ -258,6 +262,8 @@ class AddonManager(CoreSysAttributes):
         Returns a coroutine that completes when addon has state 'started' (see addon.start)
         if addon is started after update. Else nothing is returned.
         """
+        self.sys_jobs.current.reference = slug
+
         if slug not in self.local:
             raise AddonsError(f"Add-on {slug} is not installed", _LOGGER.error)
         addon = self.local[slug]
@@ -307,6 +313,7 @@ class AddonManager(CoreSysAttributes):
         )
 
     @Job(
+        name="addon_manager_rebuild",
         conditions=[
             JobCondition.FREE_SPACE,
             JobCondition.INTERNET_HOST,
@@ -320,6 +327,8 @@ class AddonManager(CoreSysAttributes):
         Returns a coroutine that completes when addon has state 'started' (see addon.start)
         if addon is started after rebuild. Else nothing is returned.
         """
+        self.sys_jobs.current.reference = slug
+
         if slug not in self.local:
             raise AddonsError(f"Add-on {slug} is not installed", _LOGGER.error)
         addon = self.local[slug]
@@ -359,6 +368,7 @@ class AddonManager(CoreSysAttributes):
         )
 
     @Job(
+        name="addon_manager_restore",
         conditions=[
             JobCondition.FREE_SPACE,
             JobCondition.INTERNET_HOST,
@@ -374,6 +384,8 @@ class AddonManager(CoreSysAttributes):
         Returns a coroutine that completes when addon has state 'started' (see addon.start)
         if addon is started after restore. Else nothing is returned.
         """
+        self.sys_jobs.current.reference = slug
+
         if slug not in self.local:
             _LOGGER.debug("Add-on %s is not local available for restore", slug)
             addon = Addon(self.coresys, slug)
@@ -396,7 +408,10 @@ class AddonManager(CoreSysAttributes):
 
         return wait_for_start
 
-    @Job(conditions=[JobCondition.FREE_SPACE, JobCondition.INTERNET_HOST])
+    @Job(
+        name="addon_manager_repair",
+        conditions=[JobCondition.FREE_SPACE, JobCondition.INTERNET_HOST],
+    )
     async def repair(self) -> None:
         """Repair local add-ons."""
         needs_repair: list[Addon] = []

@@ -1,27 +1,32 @@
 # Home Assistant Supervisor
-## 由于暂时无法编译，项目暂时搁浅
-## 首个家庭自动化私有云解决方案
 
-Home Assistant（前身为Hass.io）是一个基于容器的系统，用于管理您的Home Assistant Core安装和相关应用程序。该系统通过与Supervisor通信由Home Assistant进行控制。Supervisor提供了一个API来管理安装。这包括更改网络设置或安装和更新软件。
+## First private cloud solution for home automation
 
-## 安装
+Home Assistant (former Hass.io) is a container-based system for managing your
+Home Assistant Core installation and related applications. The system is
+controlled via Home Assistant which communicates with the Supervisor. The
+Supervisor provides an API to manage the installation. This includes changing
+network settings or installing and updating software.
 
-安装说明可在https://home-assistant.io/getting-started找到。
+## Installation
 
-## 开发
+Installation instructions can be found at https://home-assistant.io/getting-started.
 
-对于小的更改和错误修复，您可以直接遵循此步骤，但对于重大更改，请先打开RFC（请求意见书）。开发说明可以在[此处][development]找到。
+## Development
 
-## 发布
+For small changes and bugfixes you can just follow this, but for significant changes open a RFC first.
+Development instructions can be found [here][development].
 
-发布分为3个阶段（通道），具有以下结构：
+## Release
 
-1. 拉取请求合并到“main”分支。
-2. 将新构建推送到“dev”阶段。
-3. 发布版本。
-4. 将新构建推送到“beta”阶段。
-5. 更新[`stable.json`][stable]文件。
-6. 将推送到“beta”的构建现在将被推送到“stable”。
+Releases are done in 3 stages (channels) with this structure:
+
+1. Pull requests are merged to the `main` branch.
+2. A new build is pushed to the `dev` stage.
+3. Releases are published.
+4. A new build is pushed to the `beta` stage.
+5. The [`stable.json`][stable] file is updated.
+6. The build that was pushed to `beta` will now be pushed to `stable`.
 
 [development]: https://developers.home-assistant.io/docs/supervisor/development
 [stable]: https://github.com/home-assistant/version/blob/master/stable.json
